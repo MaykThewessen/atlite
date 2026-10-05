@@ -608,13 +608,15 @@ def retrieve_windspeed_average(
                 units=ds[f"u{height}"].attrs["units"],
                 long_name=f"{height} metre wind speed as long run average",
             )
+            .assign_coords(hours=ds.sizes["time"])
         )
 
     years = range(first_year, last_year + 1)
-    return xr.concat(
+    annual_means = xr.concat(
         compute(*(delayed(retrieve_chunk)(str(year)) for year in years)),
         dim=pd.Index(years, name="year"),
-    ).mean("year")
+    )
+    return annual_means.weighted(annual_means.hours).mean("year")
 
 
 def get_data_windspeed_bias_correction(cutout, retrieval_params, creation_parameters):
@@ -633,7 +635,11 @@ def get_data_windspeed_bias_correction(cutout, retrieval_params, creation_parame
     data_average = retrieve_windspeed_average(cutout, height, **retrieval_params)
 
     bias_correction = calculate_windspeed_bias_correction(
-        cutout, real_average_path, height=height, data_average=data_average
+        cutout,
+        real_average_path,
+        height=height,
+        data_average=data_average,
+        data_crs=crs,
     )
     return bias_correction.to_dataset(name="wnd_bias_correction")
 

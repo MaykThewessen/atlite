@@ -136,7 +136,7 @@ def extrapolate_wind_speed(
 
 def calculate_windspeed_bias_correction(
     cutout,
-    real_average: str | rio.DatasetReader,
+    real_average: str | Path | rio.DatasetReader | rio.Band,
     height: int = 100,
     data_average: xr.DataArray | None = None,
     data_crs: CRS | str | int | None = None,
@@ -179,7 +179,7 @@ def calculate_windspeed_bias_correction(
 
         for module in np.atleast_1d(cutout.module):
             retrieve_windspeed_average = getattr(
-                getattr(datasets, module), "retrieve_windspeed_average"
+                getattr(datasets, module), "retrieve_windspeed_average", None
             )
             if retrieve_windspeed_average is not None:
                 data_crs = getattr(datasets, module).crs
@@ -195,12 +195,17 @@ def calculate_windspeed_bias_correction(
         data_average = retrieve_windspeed_average(cutout, height)
 
     if isinstance(real_average, str | Path):
-        real_average = rio.open(real_average)
+        with rio.open(real_average) as raster:
+            return calculate_windspeed_bias_correction(
+                cutout, rio.band(raster, 1), height, data_average, data_crs
+            )
 
     if isinstance(real_average, rio.DatasetReader):
         real_average = rio.band(real_average, 1)
 
     if isinstance(real_average, rio.Band):
+        # Rasterio arrays use row/column order, independent of xarray dim order.
+        data_average = data_average.transpose("y", "x")
         transform = _as_transform(data_average.indexes["x"], data_average.indexes["y"])
 
         real_average, _ = rio.warp.reproject(

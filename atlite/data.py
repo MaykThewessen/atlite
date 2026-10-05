@@ -234,11 +234,12 @@ def cutout_prepare(
         new_features = set(da.attrs["feature"] for da in ds.data_vars.values())
         if not new_features:
             logger.warning("No new features prepared")
-            return
+            continue
+        prepared |= new_features
         attrs = non_bool_dict(
             cutout.data.attrs
             | ds.attrs
-            | dict(prepared_features=list(prepared | new_features))
+            | dict(prepared_features=list(prepared))
             | parameter_updates
         )
 
